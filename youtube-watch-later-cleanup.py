@@ -12,8 +12,6 @@ def debug(data):
     if (debug):
         print(data)
 
-# d.dump("dump.xml")
-
 def load_data():
     with open("data.json", "r") as f:
         return json.load(f)
@@ -28,6 +26,7 @@ debug("Loaded data")
 
 def stop_handle(signal_received, frame):
     debug("stop_handle: saving data")
+    data['saved_videos'].sort()
     save_data(data)
     debug("stop_handle: saved data")
 
@@ -63,31 +62,45 @@ def delete_view(view):
   debug("delete_view: Waiting for remove from watch later to be gone")
   d(text="Removed From Watch Later").wait.gone(timeout=5000)
 
+def deletePrivateVideos():
+  privateVideos = d(text="[Private video]")
+  for privateVideo in privateVideos:
+    debug("Private video")
+    delete_view(privateVideo)
+
+def removeVideosByCertainAuthors():
+  authors = d(resourceId="com.google.android.youtube:id/author")
+  for authorView in authors:
+    author = authorView.text
+    if author in data['remove_videos_by_authors']:
+      debug("AuthorView")
+      stdout.write('D')
+
+      delete_view(authorView)
+
+      if author not in data['deleted_authors']:
+        data['deleted_authors'][author] = 0
+
+      data['deleted_authors'][author] += 1
+
+def recordVideosListed():
+  authors = d(resourceId="com.google.android.youtube:id/author")
+  for authorView in authors:
+    titleView = authorView.sibling(resourceId="com.google.android.youtube:id/title")
+
+    author = authorView.text
+    title = titleView.text
+    videoName = author + ": " + title
+
+    if videoName not in data['saved_videos']:
+        data['saved_videos'].append(videoName)
+
 def main():
   while True:
-    privateVideos = d(text="[Private video]")
-    for privateVideo in privateVideos:
-      debug("Private video")
-      delete_view(privateVideo)
-
-    authors = d(resourceId="com.google.android.youtube:id/author")
-    for authorView in authors:
-      author = authorView.text
-      if author in data['remove_videos_by_authors']:
-        debug("AuthorView")
-        stdout.write('D')
-
-        delete_view(authorView)
-
-        if author not in data['deleted_authors']:
-            data['deleted_authors'][author] = 0
-
-        data['deleted_authors'][author] += 1
-      else:
-        stdout.write('.')
-        if not author in data['unknown_authors'] and not author in data['ignore_videos_by_authors']:
-          data['unknown_authors'].append(author)
-      stdout.flush()
+    deletePrivateVideos()
+    removeVideosByCertainAuthors()
+    recordVideosListed()
+    stdout.flush()
     debug("Scrolling")
     d().scroll()
 
